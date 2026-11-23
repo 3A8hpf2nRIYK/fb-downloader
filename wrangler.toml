@@ -1,0 +1,8 @@
+name = "fb-downloader-bot"
+main = "worker/src/index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+GITHUB_REPO = "43VfQLAv0MTy/fuzzy-train"
+GITHUB_REF = "main"
+WORKFLOW_FILE = "download.yml"

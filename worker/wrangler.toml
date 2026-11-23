@@ -1,0 +1,11 @@
+name = "fb-downloader-bot"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+GITHUB_REPO = "USERNAME/NAMA-REPO"   # <- ganti dengan repo GitHub kamu
+GITHUB_REF = "main"
+WORKFLOW_FILE = "download.yml"
+
+# Secret (diisi lewat `npx wrangler secret put ...`, jangan ditulis di sini):
+#   BOT_TOKEN, WEBHOOK_SECRET, GITHUB_TOKEN, ALLOWED_USERS (opsional)

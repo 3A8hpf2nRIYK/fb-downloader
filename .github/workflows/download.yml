@@ -1,0 +1,56 @@
+name: Download Facebook Video
+
+on:
+  workflow_dispatch:
+    inputs:
+      chat_id:
+        description: "Telegram chat ID"
+        required: true
+      url:
+        description: "Link video Facebook"
+        required: true
+      user_msg_id:
+        description: "ID pesan dari user"
+        required: true
+      status_msg_id:
+        description: "ID pesan status bot"
+        required: true
+      quality:
+        description: "Tinggi video (mis. 720) atau best"
+        required: false
+        default: "best"
+      mode:
+        description: "video, caption (teks saja), both (video + teks), atau formats (daftar kualitas)"
+        required: false
+        default: "video"
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          pip install -r requirements.txt
+
+      - name: Download and send video
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          CHAT_ID: ${{ inputs.chat_id }}
+          URL: ${{ inputs.url }}
+          USER_MSG_ID: ${{ inputs.user_msg_id }}
+          STATUS_MSG_ID: ${{ inputs.status_msg_id }}
+          QUALITY: ${{ inputs.quality }}
+          MODE: ${{ inputs.mode }}
+        run: python job.py

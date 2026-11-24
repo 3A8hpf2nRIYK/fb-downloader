@@ -1,0 +1,49 @@
+name: Retry Failed Downloads
+
+# Mengulang run download.yml yang gagal, sekali saja, supaya gangguan
+# sementara (mis. server Telegram error 500) sembuh sendiri tanpa user
+# harus kirim ulang linknya. Berjalan tiap 15 menit dan bisa dipicu manual.
+#
+# Pengaman dari pengulangan tanpa henti:
+# - Hanya run dengan run_attempt == 1 (hasil rerun tidak diulang lagi).
+# - Hanya run yang berumur di bawah 2 jam.
+# - Hanya run yang sudah selesai (status completed) dan gagal.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Rerun recently failed downloads once
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OWNER="3A8hpf2nRIYK"
+          REPO="fb-downloader"
+          NOW=$(date +%s)
+          RUNS=$(gh api "repos/$OWNER/$REPO/actions/workflows/download.yml/runs?status=completed&per_page=5" \
+            --jq '.workflow_runs[] | select(.conclusion=="failure") | select(.run_attempt==1) | .id')
+          if [ -z "$RUNS" ]; then
+            echo "Tidak ada run gagal yang perlu diulang."
+            exit 0
+          fi
+          for RUN_ID in $RUNS; do
+            CREATED=$(gh api "repos/$OWNER/$REPO/actions/runs/$RUN_ID" --jq '.created_at')
+            AGE=$(( NOW - $(date -d "$CREATED" +%s) ))
+            if [ "$AGE" -lt 7200 ]; then
+              echo "Mengulang run gagal $RUN_ID (umur ${AGE} detik)"
+              gh api -X POST "repos/$OWNER/$REPO/actions/runs/$RUN_ID/rerun-failed-jobs" --silent \
+                && echo "Run $RUN_ID dijadwalkan ulang." \
+                || echo "Gagal mengulang run $RUN_ID."
+            else
+              echo "Run $RUN_ID sudah berumur ${AGE} detik, dilewati."
+            fi
+          done

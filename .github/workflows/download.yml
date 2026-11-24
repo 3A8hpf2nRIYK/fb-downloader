@@ -56,7 +56,7 @@ jobs:
           STATUS_MSG_ID: ${{ inputs.status_msg_id }}
           QUALITY: ${{ inputs.quality }}
           MODE: ${{ inputs.mode }}
-        run: python job.py
+        run: python -u job.py
 
       - name: Notify Telegram on failure
         if: failure()

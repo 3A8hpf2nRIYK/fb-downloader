@@ -476,11 +476,12 @@ def send_small(path: Path, info: dict, caption: str) -> None:
         raise RuntimeError(f"sendVideo gagal (HTTP {r.status_code})")
 
 
-async def _start_client_with_retry(max_attempts=5, delay=60):
+async def _start_client_with_retry(max_attempts=6, delay=60):
     """Login bot Telegram dengan retry untuk error 500 sementara.
 
     Mengembalikan TelegramClient yang sudah login. Mencoba sampai
-    max_attempts kali dengan jeda `delay` detik antar percobaan.
+    max_attempts kali, dengan jeda yang membesar di tiap percobaan
+    (delay, 2*delay, 3*delay, ...).
     Hanya mengulang untuk error server Telegram yang sifatnya sementara
     (RpcCallFailError dan ValueError "Request was unsuccessful" dari
     Telethon). Error lain, misalnya token salah, langsung gagal.
@@ -510,11 +511,12 @@ async def _start_client_with_retry(max_attempts=5, delay=60):
         except Exception:
             pass
         if attempt < max_attempts:
+            wait = delay * attempt
             print(
                 f"Login Telegram gagal (percobaan {attempt}/{max_attempts}): "
-                f"{reason}. Coba lagi dalam {delay} detik..."
+                f"{reason}. Coba lagi dalam {wait} detik..."
             )
-            await asyncio.sleep(delay)
+            await asyncio.sleep(wait)
     raise RuntimeError(
         f"Login Telegram gagal setelah {max_attempts} percobaan: {last_error}"
     )

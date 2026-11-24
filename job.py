@@ -476,12 +476,54 @@ def send_small(path: Path, info: dict, caption: str) -> None:
         raise RuntimeError(f"sendVideo gagal (HTTP {r.status_code})")
 
 
-async def send_large(path: Path, info: dict, caption: str) -> None:
-    from telethon import TelegramClient, functions, types
+async def _start_client_with_retry(max_attempts=5, delay=60):
+    """Login bot Telegram dengan retry untuk error 500 sementara.
+
+    Mengembalikan TelegramClient yang sudah login. Mencoba sampai
+    max_attempts kali dengan jeda `delay` detik antar percobaan.
+    Hanya mengulang untuk error server Telegram yang sifatnya sementara
+    (RpcCallFailError dan ValueError "Request was unsuccessful" dari
+    Telethon). Error lain, misalnya token salah, langsung gagal.
+    """
+    from telethon import TelegramClient
+    from telethon.errors import RpcCallFailError
     from telethon.sessions import StringSession
 
-    client = TelegramClient(StringSession(), int(API_ID), API_HASH)
-    await client.start(bot_token=BOT_TOKEN)
+    last_error = None
+    for attempt in range(1, max_attempts + 1):
+        client = TelegramClient(StringSession(), int(API_ID), API_HASH)
+        try:
+            await client.start(bot_token=BOT_TOKEN)
+            return client
+        except RpcCallFailError as e:
+            last_error = e
+            reason = f"{type(e).__name__}: {e}"
+        except ValueError as e:
+            # Telethon mengangkat ValueError ini setelah retry internalnya
+            # (6x, ~13 detik) habis tanpa hasil.
+            if "Request was unsuccessful" not in str(e):
+                raise
+            last_error = e
+            reason = str(e)
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
+        if attempt < max_attempts:
+            print(
+                f"Login Telegram gagal (percobaan {attempt}/{max_attempts}): "
+                f"{reason}. Coba lagi dalam {delay} detik..."
+            )
+            await asyncio.sleep(delay)
+    raise RuntimeError(
+        f"Login Telegram gagal setelah {max_attempts} percobaan: {last_error}"
+    )
+
+
+async def send_large(path: Path, info: dict, caption: str) -> None:
+    from telethon import functions, types
+
+    client = await _start_client_with_retry()
     try:
         # Sesi baru belum "mengenal" user. Mengambil pesan masuk dari user
         # membuat Telethon menyimpan access_hash-nya, sehingga bisa kirim file.

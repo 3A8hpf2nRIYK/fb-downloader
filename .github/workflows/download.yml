@@ -37,9 +37,12 @@ jobs:
           cache: pip
 
       - name: Install dependencies
+        timeout-minutes: 2
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
           pip install -r requirements.txt
 
       - name: Download and send video
@@ -54,3 +57,14 @@ jobs:
           QUALITY: ${{ inputs.quality }}
           MODE: ${{ inputs.mode }}
         run: python job.py
+
+      - name: Notify Telegram on failure
+        if: failure()
+        timeout-minutes: 2
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d chat_id="${{ inputs.chat_id }}" \
+            -d text="⚠️ Download gagal, kemungkinan Install dependencies stuck/timeout 2 menit. Detail: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -d reply_to_message_id="${{ inputs.user_msg_id }}"

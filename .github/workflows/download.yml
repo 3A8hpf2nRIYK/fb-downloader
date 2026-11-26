@@ -37,13 +37,32 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        timeout-minutes: 2
+        timeout-minutes: 8
         run: |
-          if ! command -v ffmpeg >/dev/null; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq ffmpeg
+          install_deps() {
+            sudo dpkg --configure -a 2>/dev/null || true
+            if ! command -v ffmpeg >/dev/null; then
+              sudo apt-get update -qq
+              sudo apt-get install -y -qq ffmpeg
+            fi
+            pip install -r requirements.txt
+          }
+          export -f install_deps
+          ok=0
+          for attempt in 1 2 3; do
+            echo "=== Percobaan install ke-$attempt dari 3 ==="
+            if timeout -k 10 120 bash -ec install_deps; then
+              echo "Install berhasil pada percobaan ke-$attempt."
+              ok=1
+              break
+            fi
+            echo "Percobaan ke-$attempt gagal atau kena timeout 2 menit."
+            if [ "$attempt" -lt 3 ]; then sleep 15; fi
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "Install gagal setelah 3 percobaan."
+            exit 1
           fi
-          pip install -r requirements.txt
 
       - name: Download and send video
         env:
@@ -66,5 +85,5 @@ jobs:
         run: |
           curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
             -d chat_id="${{ inputs.chat_id }}" \
-            -d text="⚠️ Download gagal, kemungkinan Install dependencies stuck/timeout 2 menit. Detail: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -d text="⚠️ Download gagal, kemungkinan Install dependencies stuck (sudah dicoba ulang 3x). Detail: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             -d reply_to_message_id="${{ inputs.user_msg_id }}"
